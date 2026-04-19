@@ -3,6 +3,7 @@ import Header from "./components/Header";
 import CatCard from "./components/CatCard";
 import VoteButtons from "./components/VoteButtons";
 import FeedbackMessage from "./components/FeedbackMessage";
+import { useCatVotes } from "./hooks/useCatVotes.js";
 
 import "./App.css";
 
@@ -13,22 +14,27 @@ function App() {
   const [imgLoaded, setImgLoaded] = useState(false);
   const [currentVote, setCurrentVote] = useState(null);
   const [feedback, setFeedback] = useState(null)
-  const [totalUpvotes, setTotalUpVotes] = useState(0)
-  const [totalDownvotes, setTotalDownVotes] = useState(0)
 
+  //usando o hook de votos
+  const { totalUpvotes, totalDownvotes, fetchVotes, submitVote } = useCatVotes();
 
   function GerarGato() {
 
     setLoading(true);
     setImgLoaded(false);
-    setCurrentVote(null)
+    setCurrentVote(null) //resetando o voto atual
 
     fetch("https://api.thecatapi.com/v1/images/search")
       .then((resp) => resp.json())
-      .then((data) => {
+      .then( async (data) => {
+        const novoGato = data[0];
+        setImagem(novoGato);
 
-        setImagem(data[0]);
 
+        //buscando os votos da imagem no Supabase
+        if (novoGato?.id) {
+          await fetchVotes(novoGato.id)
+        } 
       })
       .catch((error) => {
         console.log("Erro ao buscar o gato:", error);
@@ -43,24 +49,50 @@ function App() {
       });
   }
 
-  function handleUpVote() {
-    setCurrentVote(true)
-    setTotalUpVotes(prev => prev + 1);
-    setFeedback({
-      type: "success",
-      text: "Upvote registrado!"
-    })
-    setTimeout(() => setFeedback(null), 6000)
+  //ao clicar em upvote, essa função é chamada
+  async function handleUpVote() {
+    if (!imagem?.id) {
+      setFeedback({ type: "error", text: "Nenhum gato para votar!"});
+      setTimeout(() => setFeedback(null), 3000)
+      return;
+    }
+
+
+    setCurrentVote(true);
+
+    //salvando o voto no supabase
+
+    const success = await submitVote(imagem.id,imagem.url,true); 
+
+
+    if (success) {
+      setFeedback({ type: "success", text: "Upvote registrado!"})
+    } else {
+      setFeedback({ type: "error", text: "Ocorreu um erro ao registrar o voto"})
+    }
+    setTimeout(() => setFeedback(null), 3000)
   }
 
-  function handleDownVote() {
-    setCurrentVote(false)
-    setTotalDownVotes(prev => prev + 1);
-    setFeedback({
-      type: "success",
-      text: "Downvote registrado!"
-    })
-    setTimeout(() => setFeedback(null), 6000)
+  async function handleDownVote() {
+    if (!imagem?.id) {
+      setFeedback({ type: "error", text: "Nenhum gato para votar!"});
+      setTimeout(() => setFeedback(null), 3000)
+      return;
+    }
+
+
+    setCurrentVote(false);
+
+    //salvando o voto no supabase
+    const success = await submitVote(imagem.id,imagem.url, false); //colocando a imagemid, a url da imagem, e o boolean false nas tabelas
+
+
+    if (success) {
+      setFeedback({ type: "success", text: "Downvote registrado!"})
+    } else {
+      setFeedback({ type: "error", text: "Ocorreu um erro ao registrar o voto"})
+    }
+    setTimeout(() => setFeedback(null), 3000)
   }
 
   useEffect(() => {
